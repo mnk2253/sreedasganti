@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+// Fix: Use direct @firebase/firestore package to resolve missing exports
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from '@firebase/firestore';
 import { db } from '../firebase';
 import { EmergencyContact, UserProfile } from '../types';
 import { 

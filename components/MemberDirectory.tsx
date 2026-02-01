@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+// Fix: Use @firebase/firestore to resolve exported member errors
+import { collection, onSnapshot, query, where } from '@firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile } from '../types';
-import { Search, Phone, MessageSquare, Briefcase, User as UserIcon, Copy, Check, Bell, Clock } from 'lucide-react';
+import { Search, Phone, MessageSquare, Briefcase, User as UserIcon, Copy, Check, Bell, Clock, CreditCard } from 'lucide-react';
 
 interface MemberDirectoryProps {
   currentUser: UserProfile;
@@ -49,6 +50,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({ currentUser, o
   const filteredMembers = members.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     m.phone.includes(searchTerm) ||
+    (m.voterNumber && m.voterNumber.includes(searchTerm)) ||
     m.occupation.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -58,7 +60,7 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({ currentUser, o
         <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
         <input
           type="text"
-          placeholder="সদস্য খুঁজুন (নাম, নাম্বার বা পেশা)..."
+          placeholder="সদস্য খুঁজুন (নাম, নাম্বার, ভোটার নাম্বার বা পেশা)..."
           className="w-full pl-10 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-green-500 outline-none transition-all"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -119,6 +121,11 @@ export const MemberDirectory: React.FC<MemberDirectoryProps> = ({ currentUser, o
                 <p className="text-[11px] text-gray-600 font-medium flex items-center mt-0.5 truncate">
                   <Briefcase size={12} className="mr-1 inline text-green-600 flex-shrink-0" /> {member.occupation}
                 </p>
+                {member.voterNumber && (
+                   <p className="text-[10px] text-indigo-500 font-bold flex items-center mt-0.5 truncate">
+                     <CreditCard size={11} className="mr-1 flex-shrink-0" /> ভোটার: {member.voterNumber}
+                   </p>
+                )}
                 
                 <div className="mt-2 flex items-center">
                   <div className="bg-gray-50 px-3 py-1 rounded-lg border border-gray-100 flex items-center group cursor-pointer" onClick={() => handleCopy(member.phone, member.id)}>

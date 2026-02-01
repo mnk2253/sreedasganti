@@ -1,8 +1,9 @@
 
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-import { getAuth } from "firebase/auth";
+// Fix: Use direct @firebase package subpaths to resolve missing export errors in this environment
+import { initializeApp } from "@firebase/app";
+import { getFirestore } from "@firebase/firestore";
+import { getStorage } from "@firebase/storage";
+import { getAuth } from "@firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAp4MKtoOHIQjrTjmoCTtIS1sQlVFFCMX0",

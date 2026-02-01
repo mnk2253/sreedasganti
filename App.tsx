@@ -11,14 +11,17 @@ import {
   LayoutGrid, 
   Smartphone, 
   Heart, 
-  Image as ImageIcon,
+  ImageIcon,
   MessageCircle,
   X,
   Volume2,
   Menu as MenuIcon,
   ChevronRight,
-  PhoneCall
+  PhoneCall,
+  Sparkles,
+  CreditCard
 } from 'lucide-react';
+// Fix: Use direct @firebase/firestore package to resolve missing named exports
 import { 
   doc, 
   onSnapshot,
@@ -27,7 +30,7 @@ import {
   orderBy,
   limit,
   updateDoc
-} from 'firebase/firestore';
+} from '@firebase/firestore';
 import { db } from './firebase';
 import { UserProfile, Post, ChatMessage } from './types';
 
@@ -39,6 +42,8 @@ import { ChatSystem } from './components/ChatSystem';
 import { AdminPanel } from './components/AdminPanel';
 import { ProfileView } from './components/ProfileView';
 import { EmergencyContacts } from './components/EmergencyContacts';
+import { AIAssistant } from './components/AIAssistant';
+import { VoterList } from './components/VoterList';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
@@ -61,7 +66,7 @@ const App: React.FC = () => {
     audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
   }, []);
 
-  // Improved Presence Logic
+  // Presence Logic
   useEffect(() => {
     if (!user?.id) return;
 
@@ -233,16 +238,10 @@ const App: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <MenuCard onClick={() => navigateTo('posts')} icon={<PlusCircle className="text-blue-600" />} label="নতুন পোস্ট" color="bg-blue-50" />
               <MenuCard 
-                onClick={() => navigateTo('members')} 
-                icon={
-                  <div className="relative">
-                    <Users className="text-purple-600" />
-                    {hasAnyUnread && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white animate-ping"></span>}
-                    {hasAnyUnread && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[7px] text-white font-black">!</span>}
-                  </div>
-                } 
-                label="সদস্যবৃন্দ" 
-                color="bg-purple-50" 
+                onClick={() => navigateTo('ai')} 
+                icon={<Sparkles className="text-indigo-600 animate-pulse" />} 
+                label="গ্রামের এআই" 
+                color="bg-indigo-50 border-indigo-200" 
               />
               <MenuCard 
                 onClick={() => navigateTo('chat')} 
@@ -256,9 +255,9 @@ const App: React.FC = () => {
                 label="চ্যাটিং" 
                 color="bg-orange-50" 
               />
+              <MenuCard onClick={() => navigateTo('voters')} icon={<CreditCard className="text-indigo-700" />} label="ভোটার তালিকা" color="bg-indigo-50" />
               <MenuCard onClick={() => navigateTo('profile')} icon={<UserIcon className="text-green-600" />} label="প্রোফাইল" color="bg-green-50" />
               {user.role === 'admin' && <MenuCard onClick={() => navigateTo('admin')} icon={<ShieldCheck className="text-red-600" />} label="অ্যাডমিন" color="bg-red-50" />}
-              <MenuCard onClick={() => setShowDownloadModal(true)} icon={<Smartphone className="text-teal-600" />} label="ডাউনলোড" color="bg-teal-50" />
               <MenuCard onClick={() => navigateTo('emergency')} icon={<PhoneCall className="text-rose-600" />} label="জরুরি নাম্বার" color="bg-rose-50" />
             </div>
           </div>
@@ -279,7 +278,9 @@ const App: React.FC = () => {
       );
       case 'posts': return <div className="p-4 pb-24"><PostList currentUser={user} filterNotices={false} /></div>;
       case 'members': return <div className="p-4 pb-24"><MemberDirectory currentUser={user} onMessageClick={startPrivateChat} unreadCounts={unreadCounts} /></div>;
+      case 'voters': return <div className="p-4 pb-24"><VoterList currentUser={user} onMessageClick={startPrivateChat} /></div>;
       case 'chat': return <div className="p-4 pb-24"><ChatSystem currentUser={user} initialTargetUser={targetChatUser} globalUnreadCounts={unreadCounts} /></div>;
+      case 'ai': return <div className="p-4 pb-24"><AIAssistant currentUser={user} /></div>;
       case 'profile': return <div className="p-4 pb-24"><ProfileView user={user} onUpdate={(updated) => {
         setUser(updated);
         localStorage.setItem('sridasgati_user', JSON.stringify(updated));
@@ -292,6 +293,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Sidebar Drawer */}
       <div 
         className={`fixed inset-0 z-[100] bg-black/50 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsSidebarOpen(false)}
@@ -312,9 +314,11 @@ const App: React.FC = () => {
             <button onClick={() => setIsSidebarOpen(false)} className="absolute top-4 right-4 p-1 hover:bg-white/10 rounded-full"><X size={24} /></button>
           </div>
 
-          <div className="p-4 overflow-y-auto max-h-[calc(100vh-160px)]">
+          <div className="p-4 overflow-y-auto max-h-[calc(100vh-160px)] no-scrollbar">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mb-2">নেভিগেশন</p>
             <SidebarItem icon={<Home size={20} />} label="হোম পেজ" onClick={() => navigateTo('home')} active={activeTab === 'home'} />
+            <SidebarItem icon={<Sparkles size={20} />} label="গ্রামের এআই" onClick={() => navigateTo('ai')} active={activeTab === 'ai'} />
+            <SidebarItem icon={<CreditCard size={20} />} label="ভোটার তালিকা" onClick={() => navigateTo('voters')} active={activeTab === 'voters'} />
             <SidebarItem icon={<PlusCircle size={20} />} label="নতুন পোস্ট" onClick={() => navigateTo('posts')} active={activeTab === 'posts'} />
             <SidebarItem icon={<MessageSquare size={20} />} label="চ্যাটিং" onClick={() => navigateTo('chat')} active={activeTab === 'chat'} badge={hasAnyUnread} />
             <SidebarItem icon={<Users size={20} />} label="সদস্যবৃন্দ" onClick={() => navigateTo('members')} active={activeTab === 'members'} badge={hasAnyUnread} />
@@ -365,8 +369,10 @@ const App: React.FC = () => {
 
       <main className="max-w-4xl mx-auto flex-1 w-full">{renderContent()}</main>
 
+      {/* Bottom Tab Bar for Mobile */}
       <div className="md:hidden fixed bottom-4 left-4 right-4 bg-white border border-gray-100 flex justify-around py-3 z-50 rounded-2xl shadow-2xl">
         <TabBtn active={activeTab === 'home'} onClick={() => navigateTo('home')} icon={<Home size={20} />} label="হোম" />
+        <TabBtn active={activeTab === 'voters'} onClick={() => navigateTo('voters')} icon={<CreditCard size={20} />} label="ভোটার" />
         <TabBtn active={activeTab === 'posts'} onClick={() => navigateTo('posts')} icon={<PlusCircle size={20} />} label="পোস্ট" />
         <TabBtn 
           active={activeTab === 'chat'} 
@@ -378,17 +384,6 @@ const App: React.FC = () => {
             </div>
           } 
           label="চ্যাট" 
-        />
-        <TabBtn 
-          active={activeTab === 'members'} 
-          onClick={() => navigateTo('members')} 
-          icon={
-            <div className="relative">
-              <Users size={20} />
-              {hasAnyUnread && activeTab !== 'members' && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>}
-            </div>
-          } 
-          label="সদস্য" 
         />
       </div>
 
@@ -427,7 +422,7 @@ const TabBtn: React.FC<{ active: boolean, onClick: () => void, icon: React.React
 );
 
 const MenuCard: React.FC<{ onClick: () => void, icon: React.ReactNode, label: string, color: string }> = ({ onClick, icon, label, color }) => (
-  <button onClick={onClick} className={`${color} p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 transition-transform active:scale-95 border border-white`}>
+  <button onClick={onClick} className={`${color} p-4 rounded-2xl flex flex-col items-center justify-center space-y-2 transition-transform active:scale-95 border border-white shadow-sm`}>
     <div className="bg-white p-2.5 rounded-xl shadow-sm">{icon}</div>
     <span className="font-bold text-gray-700 text-[11px]">{label}</span>
   </button>

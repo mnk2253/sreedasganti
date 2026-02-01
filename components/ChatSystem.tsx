@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, addDoc, query, orderBy, onSnapshot, limit, where, doc } from 'firebase/firestore';
+// Fix: Use @firebase/firestore to resolve exported member errors
+import { collection, addDoc, query, orderBy, onSnapshot, limit, where, doc } from '@firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile, ChatMessage } from '../types';
 import { Send, MessageSquare, ArrowLeft, Bell, Clock } from 'lucide-react';

@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import { updateDoc, doc } from 'firebase/firestore';
+// Fix: Use direct @firebase/firestore package to resolve missing exports
+import { updateDoc, doc } from '@firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { UserProfile } from '../types';
-import { Edit2, Save, X, Phone, User as UserIcon, Briefcase, Camera, Upload } from 'lucide-react';
+import { Edit2, Save, X, Phone, User as UserIcon, Briefcase, Camera, Upload, CreditCard, Calendar, Users } from 'lucide-react';
 
 export const ProfileView: React.FC<{ user: UserProfile, onUpdate: (u: UserProfile) => void }> = ({ user, onUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -12,6 +13,8 @@ export const ProfileView: React.FC<{ user: UserProfile, onUpdate: (u: UserProfil
   
   const [name, setName] = useState(user.name);
   const [fatherName, setFatherName] = useState(user.fatherName);
+  const [motherName, setMotherName] = useState(user.motherName || '');
+  const [birthDate, setBirthDate] = useState(user.birthDate || '');
   const [occupation, setOccupation] = useState(user.occupation);
   const [photo, setPhoto] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState(user.photoUrl);
@@ -39,11 +42,13 @@ export const ProfileView: React.FC<{ user: UserProfile, onUpdate: (u: UserProfil
       await updateDoc(userRef, {
         name,
         fatherName,
+        motherName,
+        birthDate,
         occupation,
         photoUrl
       });
 
-      onUpdate({ ...user, name, fatherName, occupation, photoUrl });
+      onUpdate({ ...user, name, fatherName, motherName, birthDate, occupation, photoUrl });
       setIsEditing(false);
     } catch (err) {
       alert('তথ্য আপডেট করতে সমস্যা হয়েছে।');
@@ -112,7 +117,7 @@ export const ProfileView: React.FC<{ user: UserProfile, onUpdate: (u: UserProfil
 
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-400 uppercase">পূর্ণ নাম</label>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">পূর্ণ নাম</label>
                 {isEditing ? (
                   <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500" value={name} onChange={(e) => setName(e.target.value)} />
                 ) : (
@@ -120,26 +125,62 @@ export const ProfileView: React.FC<{ user: UserProfile, onUpdate: (u: UserProfil
                 )}
               </div>
               
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-400 uppercase">পিতার নাম</label>
-                {isEditing ? (
-                  <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500" value={fatherName} onChange={(e) => setFatherName(e.target.value)} />
-                ) : (
-                  <p className="text-gray-700 font-medium">{user.fatherName}</p>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">পিতার নাম</label>
+                  {isEditing ? (
+                    <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500" value={fatherName} onChange={(e) => setFatherName(e.target.value)} />
+                  ) : (
+                    <p className="text-gray-700 font-medium">{user.fatherName}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">মাতার নাম</label>
+                  {isEditing ? (
+                    <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500" value={motherName} onChange={(e) => setMotherName(e.target.value)} />
+                  ) : (
+                    <p className="text-gray-700 font-medium">{user.motherName || 'তথ্য নেই'}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">জন্ম তারিখ</label>
+                  {isEditing ? (
+                    <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} placeholder="DD/MM/YYYY" />
+                  ) : (
+                    <p className="text-gray-700 font-medium flex items-center">
+                      <Calendar size={14} className="mr-2 text-rose-500" /> {user.birthDate || 'তথ্য নেই'}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">পেশা</label>
+                  {isEditing ? (
+                    <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500" value={occupation} onChange={(e) => setOccupation(e.target.value)} />
+                  ) : (
+                    <p className="text-gray-700 font-medium flex items-center">
+                      <Briefcase size={14} className="mr-2 text-green-600" /> {user.occupation}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-400 uppercase">পেশা</label>
-                {isEditing ? (
-                  <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500" value={occupation} onChange={(e) => setOccupation(e.target.value)} />
-                ) : (
-                  <p className="text-gray-700 font-medium">{user.occupation}</p>
-                )}
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">ভোটের নাম্বার</label>
+                <p className="text-gray-700 font-medium flex items-center">
+                  <CreditCard size={14} className="mr-2 text-indigo-500" /> 
+                  <span className={user.voterNumber ? "text-gray-800 font-mono font-bold" : "text-gray-400 italic"}>
+                    {user.voterNumber || 'অ্যাডমিন এখনো যুক্ত করেননি'}
+                  </span>
+                </p>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-400 uppercase">মোবাইল নাম্বার</label>
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">মোবাইল নাম্বার</label>
                 <p className="text-gray-700 font-medium flex items-center">
                   <Phone size={14} className="mr-2 text-green-600" /> {user.phone}
                 </p>

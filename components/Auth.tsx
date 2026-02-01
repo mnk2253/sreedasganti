@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { collection, query, where, getDocs, addDoc, limit } from 'firebase/firestore';
+// Fix: Use @firebase/firestore and @firebase/auth to resolve "no exported member" errors
+import { collection, query, where, getDocs, addDoc, limit } from '@firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { signInAnonymously } from 'firebase/auth';
+import { signInAnonymously } from '@firebase/auth';
 import { db, storage, auth } from '../firebase';
 import { UserProfile } from '../types';
 import { Camera, LogIn, UserPlus, Phone, Lock, User as UserIcon, Upload, AlertCircle, RefreshCw, ShieldCheck, HelpCircle } from 'lucide-react';

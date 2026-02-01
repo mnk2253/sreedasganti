@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+// Fix: Use @firebase/firestore to resolve missing exported member errors
 import { 
   collection, 
   onSnapshot, 
@@ -10,7 +11,7 @@ import {
   doc, 
   arrayUnion, 
   arrayRemove
-} from 'firebase/firestore';
+} from '@firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Post, UserProfile, Comment, CommentReply } from '../types';

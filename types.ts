@@ -6,6 +6,8 @@ export interface UserProfile {
   id: string;
   name: string;
   fatherName: string;
+  motherName?: string;
+  birthDate?: string;
   occupation: string;
   phone: string;
   password?: string;
@@ -15,6 +17,8 @@ export interface UserProfile {
   createdAt: number;
   isOnline?: boolean;
   lastSeen?: number;
+  voterNumber?: string;
+  slNo?: string;
 }
 
 export interface EmergencyContact {
@@ -33,11 +37,11 @@ export interface Post {
   userRole?: UserRole;
   content: string;
   imageUrl?: string;
-  likes: string[]; // Array of user IDs
+  likes: string[];
   comments: Comment[];
   createdAt: number;
   status?: 'active' | 'deactive';
-  isNotice?: boolean; // New field for admin announcements
+  isNotice?: boolean;
 }
 
 export interface CommentReply {
@@ -63,7 +67,7 @@ export interface ChatMessage {
   id: string;
   senderId: string;
   senderName: string;
-  receiverId?: string; // If undefined, it's a group chat
+  receiverId?: string;
   text: string;
   createdAt: number;
 }
