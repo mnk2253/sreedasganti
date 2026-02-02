@@ -1,311 +1,223 @@
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc } from '@firebase/firestore';
+import { collection, onSnapshot, query, where, doc, updateDoc, deleteDoc, limit } from '@firebase/firestore';
 import { db } from '../firebase';
 import { UserProfile } from '../types';
 import { 
   Search, 
-  MessageSquare, 
-  CreditCard, 
-  User as UserIcon, 
-  Briefcase, 
-  PhoneCall, 
   Edit2, 
   Trash2, 
-  X, 
-  Save, 
-  AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 
-interface VoterListProps {
-  currentUser: UserProfile;
-  onMessageClick: (member: UserProfile) => void;
-}
+const CHAR_MAP: Record<string, string> = {
+  'ĺ': 'ব্দ', 'Ĩ': 'সা', 'ę': 'দ্র', 'Ľ': 'ব্র', 'Ō': 'ছা', 'Ž': 'জ', 'ñ': 'ন', 'ĥ': 'ন্ম', 'ń': 'ম্ব', 'İ': 'ি', 'Ï': 'ো',
+  'Ř': 'শ্র', 'ý': 'গঞ্জ', 'ঁ': 'া'
+};
 
-export const VoterList: React.FC<VoterListProps> = ({ currentUser, onMessageClick }) => {
-  const [voters, setVoters] = useState<UserProfile[]>([]);
+const cleanText = (text: string): string => {
+  if (!text) return "";
+  let result = text.replace(/[ĺĨęĽŌŽñĥńİÏŘýঁ]/g, match => CHAR_MAP[match] || match);
+  const replacements: [RegExp, string][] = [
+    [/োমাছাঃ/g, 'মোছাঃ'], [/োমাঃ/g, 'মোঃ'], [/োভাটার/g, 'ভোটার'],
+    [/িপতা/g, 'পিতা'], [/ামাতা/g, 'মাতা'], [/োপেশা/g, 'পেশা'],
+    [/ে\s*া/g, 'ো'], [/ে\s*ৗ/g, 'ৌ'], [/ি\s+/g, 'ি'],
+    [/ু\s+/g, 'ু'], [/র্\s+/g, 'র্']
+  ];
+  for (const [pattern, rep] of replacements) {
+    result = result.replace(pattern, rep);
+  }
+  return result.trim();
+};
+
+export const VoterList: React.FC<{ currentUser: UserProfile }> = ({ currentUser }) => {
+  const [voters, setVoters] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [genderFilter, setGenderFilter] = useState<'All' | 'Male' | 'Female'>('All');
   const [loading, setLoading] = useState(true);
-  
-  // Edit State
-  const [editingVoter, setEditingVoter] = useState<UserProfile | null>(null);
+  const [visibleCount, setVisibleCount] = useState(50);
+  const [editingVoter, setEditingVoter] = useState<any | null>(null);
+  const [editData, setEditData] = useState<any>({});
   const [isUpdating, setIsUpdating] = useState(false);
-  const [editData, setEditData] = useState({
-    name: '',
-    fatherName: '',
-    voterNumber: '',
-    occupation: ''
-  });
 
   const isAdmin = currentUser.role === 'admin';
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'users'), 
-      where('status', '==', 'active')
-    );
-
+    const q = query(collection(db, 'voters'), where('status', '==', 'active'), limit(2500));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allActive = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as UserProfile));
-      const withVoters = allActive.filter(u => u.voterNumber && u.voterNumber.trim() !== '');
-      setVoters(withVoters);
+      const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      data.sort((a: any, b: any) => (parseInt(a.slNo) || 0) - (parseInt(b.slNo) || 0));
+      setVoters(data);
       setLoading(false);
     });
-
     return unsubscribe;
   }, []);
 
-  const handleDelete = async (voterId: string, voterName: string) => {
-    if (window.confirm(`${voterName}-কে কি নিশ্চিতভাবে তালিকা থেকে মুছে ফেলতে চান?`)) {
-      try {
-        await deleteDoc(doc(db, 'users', voterId));
-        alert('সফলভাবে মুছে ফেলা হয়েছে।');
-      } catch (err) {
-        alert('মুছে ফেলতে সমস্যা হয়েছে।');
-      }
+  const handleDelete = async (id: string, name: string) => {
+    if (window.confirm(`${cleanText(name)}-কে ডিলিট করতে চান?`)) {
+      await deleteDoc(doc(db, 'voters', id));
     }
-  };
-
-  const openEditModal = (voter: UserProfile) => {
-    setEditingVoter(voter);
-    setEditData({
-      name: voter.name,
-      fatherName: voter.fatherName,
-      voterNumber: voter.voterNumber || '',
-      occupation: voter.occupation
-    });
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingVoter || isUpdating) return;
-
     setIsUpdating(true);
     try {
-      await updateDoc(doc(db, 'users', editingVoter.id), {
-        name: editData.name.trim(),
-        fatherName: editData.fatherName.trim(),
-        voterNumber: editData.voterNumber.trim(),
-        occupation: editData.occupation.trim()
-      });
+      await updateDoc(doc(db, 'voters', editingVoter.id), editData);
       setEditingVoter(null);
-      alert('তথ্য আপডেট করা হয়েছে।');
     } catch (err) {
-      alert('আপডেট করতে সমস্যা হয়েছে।');
+      alert('Error updating.');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const filteredVoters = voters.filter(v => 
-    v.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    v.phone.includes(searchTerm) ||
-    (v.voterNumber && v.voterNumber.includes(searchTerm))
+  const filteredVoters = voters.filter(v => {
+    const s = searchTerm.toLowerCase().trim();
+    const searchable = `${v.name} ${v.voterNumber} ${v.slNo} ${v.fatherName}`.toLowerCase();
+    return searchable.includes(s) && (genderFilter === 'All' || v.gender === genderFilter);
+  });
+
+  if (loading) return (
+    <div className="flex justify-center py-24">
+      <RefreshCw className="animate-spin text-slate-300" size={32} />
+    </div>
   );
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        <p className="mt-4 text-gray-400 text-sm">ভোটার তালিকা লোড হচ্ছে...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-24">
-      <div className="bg-gradient-to-br from-indigo-700 to-blue-800 rounded-[32px] p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="bg-white/20 w-fit p-3 rounded-2xl mb-4 backdrop-blur-md">
-            <CreditCard size={28} />
-          </div>
-          <h2 className="text-2xl font-black">ভোটার তালিকা (Voter List)</h2>
-          <p className="text-indigo-100 text-sm mt-1 opacity-90">শ্রীদাসগাতী গ্রামের নিবন্ধিত ভোটারদের তালিকা।</p>
-          <div className="mt-6 inline-flex items-center space-x-2 bg-white/10 px-4 py-2 rounded-full border border-white/20">
-            <span className="text-xs font-bold uppercase tracking-widest">Total Voters:</span>
-            <span className="text-lg font-black">{voters.length}</span>
-          </div>
+    <div className="max-w-7xl mx-auto py-4 px-2 sm:py-6 sm:px-4">
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-1">ভোটার তালিকা</h2>
+        <p className="text-slate-400 text-[8px] sm:text-[10px] font-bold uppercase tracking-[0.2em]">Village Database System</p>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+          <input 
+            type="text" 
+            placeholder="নাম বা সিরিয়াল..." 
+            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-900 transition-all font-bold text-[10px] sm:text-xs"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-           <CreditCard size={140} />
+        <div className="flex items-center space-x-1 bg-slate-50 p-1 rounded-lg border border-slate-100 overflow-x-auto no-scrollbar">
+          {['All', 'Male', 'Female'].map(g => (
+            <button 
+              key={g} 
+              onClick={() => setGenderFilter(g as any)}
+              className={`whitespace-nowrap px-3 py-1.5 rounded-md text-[8px] sm:text-[10px] font-black uppercase transition-all ${genderFilter === g ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              {g === 'All' ? 'সবাই' : g === 'Male' ? 'পুরুষ' : 'মহিলা'}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="relative px-2">
-        <Search className="absolute left-6 top-3.5 text-gray-400" size={20} />
-        <input
-          type="text"
-          placeholder="Search by Name, Phone or Voter ID..."
-          className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm relative">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse table-fixed min-w-full">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[7px] sm:text-[9px] font-black uppercase tracking-tighter sm:tracking-widest">
+                <th className="px-1 py-2 sm:px-4 sm:py-3 text-center w-[8%]">SL</th>
+                <th className="px-1 py-2 sm:px-4 sm:py-3 w-[25%]">নাম ও তথ্য</th>
+                <th className="px-1 py-2 sm:px-4 sm:py-3 w-[15%]">মাতা</th>
+                <th className="px-1 py-2 sm:px-4 sm:py-3 w-[15%]">পিতা</th>
+                <th className="px-1 py-2 sm:px-4 sm:py-3 w-[14%]">জন্ম</th>
+                <th className="px-1 py-2 sm:px-4 sm:py-3 w-[15%]">আইডি</th>
+                {isAdmin && <th className="px-1 py-2 sm:px-4 sm:py-3 text-center w-[8%]">Action</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredVoters.slice(0, visibleCount).map((v) => (
+                <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-1 py-1.5 sm:px-4 sm:py-2.5 text-center">
+                    <span className="text-[7px] sm:text-[10px] font-black text-slate-400">{v.slNo}</span>
+                  </td>
+                  <td className="px-1 py-1.5 sm:px-4 sm:py-2.5">
+                    <div className="flex items-center space-x-1 sm:space-x-2.5">
+                      <img src={v.photoUrl} className="h-5 w-5 sm:h-8 sm:w-8 rounded-md object-cover bg-slate-100 border border-slate-200 flex-shrink-0" alt="" />
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 text-[8px] sm:text-[11px] leading-tight truncate">{cleanText(v.name)}</p>
+                        <p className="text-[6px] sm:text-[8px] text-slate-400 font-bold uppercase">{v.gender === 'Female' ? 'মহিলা' : 'পুরুষ'}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-1 py-1.5 sm:px-4 sm:py-2.5">
+                    <p className="text-[7px] sm:text-[10px] text-slate-600 font-medium truncate">{cleanText(v.motherName) || '-'}</p>
+                  </td>
+                  <td className="px-1 py-1.5 sm:px-4 sm:py-2.5">
+                    <p className="text-[7px] sm:text-[10px] text-slate-600 font-medium truncate">{cleanText(v.fatherName)}</p>
+                  </td>
+                  <td className="px-1 py-1.5 sm:px-4 sm:py-2.5">
+                    <p className="text-[7px] sm:text-[10px] text-slate-500 font-mono font-bold truncate">{v.birthDate || '-'}</p>
+                  </td>
+                  <td className="px-1 py-1.5 sm:px-4 sm:py-2.5">
+                    <p className="text-[7px] sm:text-[10px] text-slate-900 font-mono font-black truncate">{v.voterNumber || '-'}</p>
+                  </td>
+                  {isAdmin && (
+                    <td className="px-1 py-1.5 sm:px-4 sm:py-2.5">
+                      <div className="flex items-center justify-center space-x-0.5 sm:space-x-1">
+                        <button onClick={() => { setEditingVoter(v); setEditData(v); }} className="p-0.5 sm:p-1.5 text-slate-400 hover:text-blue-600"><Edit2 size={10}/></button>
+                        <button onClick={() => handleDelete(v.id, v.name)} className="p-0.5 sm:p-1.5 text-slate-400 hover:text-rose-600"><Trash2 size={10}/></button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
-        {filteredVoters.map(voter => (
-          <div key={voter.id} className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all flex flex-col space-y-4 relative group">
-            {isAdmin && (
-              <div className="absolute top-4 right-4 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => openEditModal(voter)}
-                  className="bg-blue-50 text-blue-600 p-2 rounded-xl hover:bg-blue-100 transition-colors shadow-sm"
-                  title="Edit Voter"
-                >
-                  <Edit2 size={16} />
-                </button>
-                <button 
-                  onClick={() => handleDelete(voter.id, voter.name)}
-                  className="bg-red-50 text-red-600 p-2 rounded-xl hover:bg-red-100 transition-colors shadow-sm"
-                  title="Delete Voter"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            )}
+      {visibleCount < filteredVoters.length && (
+        <div className="mt-6 flex justify-center">
+          <button onClick={() => setVisibleCount(v => v + 50)} className="bg-white border border-slate-200 px-6 py-2 rounded-lg text-[8px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
+            আরও লোড করুন
+          </button>
+        </div>
+      )}
 
-            <div className="flex items-start space-x-4">
-              <img 
-                src={voter.photoUrl} 
-                className="h-20 w-20 rounded-2xl object-cover border-2 border-indigo-50 shadow-sm" 
-                alt={voter.name} 
-              />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-800 text-lg truncate leading-tight pr-12">{voter.name}</h3>
-                <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mt-1">Verified Voter</p>
-                
-                <div className="mt-3 space-y-2">
-                   <div className="flex flex-col">
-                     <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Father's Name / পিতার নাম</span>
-                     <div className="flex items-center text-xs text-gray-600 font-bold">
-                        <UserIcon size={12} className="mr-1.5 text-gray-400" />
-                        <span className="truncate">{voter.fatherName}</span>
-                     </div>
-                   </div>
-                   
-                   <div className="flex flex-col">
-                     <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Occupation / পেশা</span>
-                     <div className="flex items-center text-xs text-gray-600 font-bold">
-                        <Briefcase size={12} className="mr-1.5 text-gray-400" />
-                        <span className="truncate">{voter.occupation}</span>
-                     </div>
-                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-indigo-50 rounded-2xl p-4 border border-indigo-100 flex items-center justify-between">
-              <div>
-                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Voter ID Number</p>
-                <p className="text-indigo-800 font-black text-base font-mono tracking-wider">{voter.voterNumber}</p>
-              </div>
-              <div className="bg-white p-2 rounded-xl shadow-sm">
-                <CreditCard size={20} className="text-indigo-600" />
-              </div>
-            </div>
-
-            <div className="flex space-x-2">
-              <a 
-                href={`tel:${voter.phone}`}
-                className="flex-1 bg-green-600 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-green-100 active:scale-95 transition-all"
-              >
-                <PhoneCall size={14} />
-                <span>Call / কল করুন</span>
-              </a>
-              <button 
-                onClick={() => onMessageClick(voter)}
-                className="flex-1 bg-indigo-50 text-indigo-700 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 border border-indigo-100 active:scale-95 transition-all"
-              >
-                <MessageSquare size={14} />
-                <span>Message / মেসেজ</span>
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {filteredVoters.length === 0 && (
-          <div className="col-span-full text-center py-20 bg-white rounded-[32px] border border-dashed border-gray-200">
-            <CreditCard size={48} className="mx-auto text-gray-200 mb-3" />
-            <p className="text-gray-400 text-sm">কোন ভোটার খুঁজে পাওয়া যায়নি।</p>
-          </div>
-        )}
-      </div>
-
-      {/* Edit Voter Modal */}
+      {/* Edit Modal */}
       {editingVoter && (
-        <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="bg-indigo-600 p-6 text-white flex items-center justify-between">
-              <h3 className="font-bold text-lg flex items-center"><Edit2 className="mr-2" size={20} /> ভোটার তথ্য সংশোধন</h3>
-              <button onClick={() => setEditingVoter(null)} className="hover:bg-white/10 p-1 rounded-full"><X size={24}/></button>
-            </div>
-            
-            <form onSubmit={handleUpdate} className="p-8 space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">ভোটার নাম</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                    value={editData.name}
-                    onChange={(e) => setEditData({...editData, name: e.target.value})}
-                    required
-                  />
+        <div className="fixed inset-0 z-[120] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-slate-100">
+             <div className="p-4 border-b border-slate-50 flex justify-between items-center bg-slate-900 text-white">
+                <h3 className="font-black text-xs uppercase tracking-widest">তথ্য সংশোধন</h3>
+                <button onClick={() => setEditingVoter(null)}><X size={18}/></button>
+             </div>
+             <form onSubmit={handleUpdate} className="p-5 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                   <div className="sm:col-span-2">
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">নাম</label>
+                      <input className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold" value={editData.name} onChange={e => setEditData({...editData, name: e.target.value})} />
+                   </div>
+                   <div>
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">পিতার নাম</label>
+                      <input className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold" value={editData.fatherName} onChange={e => setEditData({...editData, fatherName: e.target.value})} />
+                   </div>
+                   <div>
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">মাতার নাম</label>
+                      <input className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold" value={editData.motherName} onChange={e => setEditData({...editData, motherName: e.target.value})} />
+                   </div>
+                   <div>
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">সিরিয়াল</label>
+                      <input className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold" value={editData.slNo} onChange={e => setEditData({...editData, slNo: e.target.value})} />
+                   </div>
+                   <div>
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">ভোটার আইডি</label>
+                      <input className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold font-mono" value={editData.voterNumber} onChange={e => setEditData({...editData, voterNumber: e.target.value})} />
+                   </div>
                 </div>
-                
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">পিতার নাম</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                    value={editData.fatherName}
-                    onChange={(e) => setEditData({...editData, fatherName: e.target.value})}
-                    required
-                  />
+                <div className="flex space-x-2 pt-3">
+                   <button type="button" onClick={() => setEditingVoter(null)} className="flex-1 py-2 bg-slate-100 text-slate-500 rounded-lg font-black text-[9px] uppercase">বাতিল</button>
+                   <button type="submit" disabled={isUpdating} className="flex-1 py-2 bg-slate-900 text-white rounded-lg font-black text-[9px] uppercase hover:bg-slate-800 transition-all">
+                      {isUpdating ? 'আপডেট...' : 'সেভ করুন'}
+                   </button>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">ভোটার নাম্বার</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm font-mono font-bold text-indigo-600 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                      value={editData.voterNumber}
-                      onChange={(e) => setEditData({...editData, voterNumber: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">পেশা</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                      value={editData.occupation}
-                      onChange={(e) => setEditData({...editData, occupation: e.target.value})}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3 pt-4">
-                <button 
-                  type="button" 
-                  onClick={() => setEditingVoter(null)}
-                  className="flex-1 bg-gray-100 text-gray-600 py-3.5 rounded-2xl font-bold hover:bg-gray-200 transition-colors"
-                >
-                  বাতিল
-                </button>
-                <button 
-                  type="submit"
-                  disabled={isUpdating}
-                  className="flex-2 bg-indigo-600 text-white py-3.5 px-8 rounded-2xl font-bold shadow-lg shadow-indigo-100 flex items-center justify-center space-x-2 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  {isUpdating ? <RefreshCw className="animate-spin" size={18} /> : <><Save size={18} /> <span>পরিবর্তন সেভ করুন</span></>}
-                </button>
-              </div>
-            </form>
+             </form>
           </div>
         </div>
       )}
