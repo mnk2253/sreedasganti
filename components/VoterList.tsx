@@ -81,8 +81,23 @@ export const VoterList: React.FC<{ currentUser: UserProfile }> = ({ currentUser 
 
   const filteredVoters = voters.filter(v => {
     const s = searchTerm.toLowerCase().trim();
-    const searchable = `${v.name} ${v.voterNumber} ${v.slNo} ${v.fatherName}`.toLowerCase();
-    return searchable.includes(s) && (genderFilter === 'All' || v.gender === genderFilter);
+    if (!s) return genderFilter === 'All' || v.gender === genderFilter;
+
+    // Search against cleaned (visible) text and specific fields
+    const cleanedName = cleanText(v.name).toLowerCase();
+    const cleanedFather = cleanText(v.fatherName).toLowerCase();
+    const slNo = (v.slNo || '').toString().toLowerCase();
+    const birthDate = (v.birthDate || '').toLowerCase();
+    const voterNumber = (v.voterNumber || '').toLowerCase();
+
+    const matchesSearch = 
+      cleanedName.includes(s) || 
+      cleanedFather.includes(s) || 
+      slNo.includes(s) || 
+      birthDate.includes(s) || 
+      voterNumber.includes(s);
+
+    return matchesSearch && (genderFilter === 'All' || v.gender === genderFilter);
   });
 
   if (loading) return (
@@ -103,7 +118,7 @@ export const VoterList: React.FC<{ currentUser: UserProfile }> = ({ currentUser 
           <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
           <input 
             type="text" 
-            placeholder="নাম বা সিরিয়াল..." 
+            placeholder="নাম, সিরিয়াল (SL) বা জন্ম তারিখ দিয়ে খুঁজুন..." 
             className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-900 transition-all font-bold text-[10px] sm:text-xs"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -146,10 +161,12 @@ export const VoterList: React.FC<{ currentUser: UserProfile }> = ({ currentUser 
                       <img src={v.photoUrl} className="h-6 w-6 sm:h-8 sm:w-8 rounded-md object-cover bg-slate-100 border border-slate-200 flex-shrink-0" alt="" />
                       <div className="min-w-0">
                         <p className="font-bold text-slate-900 text-[9px] sm:text-[11px] leading-tight truncate group-hover/name:text-blue-600 transition-colors underline-offset-2 group-hover/name:underline">{cleanText(v.name)}</p>
-                        <div className="flex items-center space-x-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-1 mt-0.5">
                           <p className="text-[6px] sm:text-[8px] text-slate-400 font-bold uppercase">{v.gender === 'Female' ? 'মহিলা' : 'পুরুষ'}</p>
-                          <span className="text-[6px] text-slate-200 sm:hidden">•</span>
-                          <p className="text-[6px] sm:hidden text-slate-500 font-bold font-mono">{v.birthDate || '-'}</p>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-[6px] text-slate-200 hidden sm:inline">•</span>
+                            <p className="text-[6px] text-slate-500 font-bold font-mono">{v.birthDate || '-'}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -276,6 +293,10 @@ export const VoterList: React.FC<{ currentUser: UserProfile }> = ({ currentUser 
                    <div>
                       <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">মাতার নাম</label>
                       <input className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold" value={editData.motherName} onChange={e => setEditData({...editData, motherName: e.target.value})} />
+                   </div>
+                   <div>
+                      <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">জন্ম তারিখ</label>
+                      <input className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-xs font-bold font-mono" placeholder="DD/MM/YYYY" value={editData.birthDate} onChange={e => setEditData({...editData, birthDate: e.target.value})} />
                    </div>
                    <div>
                       <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 block">সিরিয়াল</label>
